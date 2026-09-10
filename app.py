@@ -30,7 +30,7 @@ if uploaded_file is None:
         pass
 
 if uploaded_file is not None:
-    # Read CSV (handles both Up format and Combined format)
+    # Read CSV
     df = pd.read_csv(uploaded_file)
     
     # Standardize columns based on file type
@@ -71,7 +71,7 @@ if uploaded_file is not None:
         desc = str(row.get('Description', '')).lower()
         
         # Fixed essential keywords (Mortgage, Body Corporate, Rates, Energy)
-        if any(k in desc fork in ['mortgage', 'osko', 'deft', 'body corporate', 'rates', 'cbhs', 'flow power', 'alinta']):
+        if any(k in desc for k in ['mortgage', 'osko', 'deft', 'body corporate', 'rates', 'cbhs', 'flow power', 'alinta']):
             return 'Fixed Essential'
         
         if pd.isna(cat) or cat == 'Other':
@@ -91,7 +91,6 @@ if uploaded_file is not None:
     
     fixed_costs = outflows[outflows['Bucket'] == 'Fixed Essential']['Absolute_Total'].sum() / max(1, outflows['Date'].dt.to_period('M').nunique())
     
-    # Available variable budget after fixed costs and target savings
     available_variable_budget = max(0, avg_monthly_income - fixed_costs - target_savings)
 
     # Metrics Display
@@ -100,24 +99,22 @@ if uploaded_file is not None:
     col_m2.metric(label="Locked Fixed Costs (Mortgage/Bills)", value=f"${fixed_costs:,.0f}")
     col_m3.metric(label="Tailored Variable Budget", value=f"${available_variable_budget:,.0f}/mo", delta=f"Target Savings: ${target_savings:,}")
 
-    # --- SECTION 1: TAILORED BUDGET BREAKDOWN BASED ON SAVINGS GOAL ---
+    # --- SECTION 1: TAILORED BUDGET BREAKDOWN ---
     st.markdown("---")
     st.subheader(f"🎯 Tailored Budget for ${target_savings:,}/mo Savings Goal")
-    st.markdown("Your fixed costs (mortgage, body corporate, energy bills) are locked. Here is how your remaining variable budget splits between essentials and lifestyle:")
+    st.markdown("Your fixed costs are locked. Here is how your remaining variable budget splits between essentials and lifestyle:")
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
         st.markdown("### 🛡️ Essential Variable Spend")
         actual_essential = outflows[outflows['Bucket'] == 'Essential']['Absolute_Total'].sum() / max(1, outflows['Date'].dt.to_period('M').nunique())
         st.metric(label="Average Monthly Essential Spend", value=f"${actual_essential:,.0f}")
-        st.caption("Includes groceries, utilities, health, transport, and fitness.")
 
     with col_b2:
         st.markdown("### 🎉 Lifestyle / Discretionary Spend")
         target_lifestyle = max(0, available_variable_budget - actual_essential)
         actual_lifestyle = outflows[outflows['Bucket'] == 'Lifestyle']['Absolute_Total'].sum() / max(1, outflows['Date'].dt.to_period('M').nunique())
         st.metric(label="Target Lifestyle Budget", value=f"${target_lifestyle:,.0f}", delta=f"Actual Avg: ${actual_lifestyle:,.0f}")
-        st.caption("Dining out, entertainment, shopping, and hobbies adjusted to hit your savings target.")
 
     # --- SECTION 2: MONTH-TO-MONTH LIFESTYLE COMPARISON ---
     st.markdown("---")
@@ -136,10 +133,8 @@ if uploaded_file is not None:
         lifestyle_pivot = lifestyle_pivot.reindex([m for m in month_order if m in lifestyle_pivot.index])
 
         st.bar_chart(lifestyle_pivot)
-    else:
-        st.info("No lifestyle transactions found.")
 
-    # --- SECTION 3: ENERGY BILLS TRACKER (Flow Power & Alinta) ---
+    # --- SECTION 3: ENERGY BILLS TRACKER ---
     st.markdown("---")
     st.subheader("⚡ Energy Bills Tracker (Flow Power & Alinta Energy)")
     energy_df = outflows[outflows['Description'].str.contains('Flow Power|Alinta', case=False, na=False)].copy()
@@ -147,8 +142,6 @@ if uploaded_file is not None:
     if not energy_df.empty:
         energy_monthly = energy_df.groupby(['Month', 'Description'])['Absolute_Total'].sum().unstack().fillna(0)
         st.bar_chart(energy_monthly)
-    else:
-        st.info("No energy bill transactions detected.")
 
 else:
-    st.info("🔒 Please upload your combined transaction CSV file or ensure `combined_transactions.csv` is in your folder.")
+    st.info("🔒 Please upload your transaction CSV file above.")
